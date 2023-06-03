@@ -104,6 +104,23 @@ async function run() {
 
 
 
+    // Security Layer: (1) Check admin, (2) Check JWT, (3) Check login user email and token email
+    app.get('/users/admin/:email',verifyJWT, async(req, res) =>{
+      const email = req.params.email;
+
+      if(req.decoded.email !== email){
+        res.send({admin: false})
+      }
+
+      const query = {email: email}
+      const user = await usersCollection.findOne(query);
+      
+      const result = {admin: user?.role === 'admin'}
+      res.send(result);
+    })
+
+
+    
 
     // API to update user role like ADMIN:
     app.patch('/users/admin/:id', async (req, res) => {
