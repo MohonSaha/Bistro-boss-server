@@ -15,6 +15,34 @@ app.use(express.json())
 
 
 
+// JWT Middleware START:-
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;   // Check that wheather user have token or not
+
+  if (!authorization) {
+    return res.status(401).send({ error: true, message: "Unauthorized Access" })
+  }
+
+  // Split token from the bearer
+  const token = authorization.split(' ')[1];
+
+
+  // Verify process of tho token
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ error: true, message: "Unauthorized Access" })
+    }
+
+    req.decoded = decoded;   // 
+    next()
+  })
+}
+
+// JWT Middleware END
+
+
+
+
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.grqmol8.mongodb.net/?retryWrites=true&w=majority`;
@@ -40,31 +68,33 @@ async function run() {
     const cartCollection = client.db("bistroDB").collection("carts");
 
 
+
     // Create or post jwt 
     app.post('/jwt', (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: '6h'
+        expiresIn: '1h'
       })
-      res.send({token})
+      res.send({ token })
     })
 
 
 
+
     // user Related apis:-
-    app.get('/users', async(req, res) => {
+    app.get('/users', async (req, res) => {
       const result = await usersCollection.find().toArray()
       res.send(result)
     })
 
 
-    app.post('/users', async(req, res)=>{
+    app.post('/users', async (req, res) => {
       const user = req.body;
 
-      const query = {email: user.email}
+      const query = { email: user.email }
       const existingUser = await usersCollection.findOne(query);
-      if(existingUser){
-        return res.send({message: 'User already exist'})
+      if (existingUser) {
+        return res.send({ message: 'User already exist' })
       }
 
       // If user do not find previous then insert it in database
@@ -73,10 +103,12 @@ async function run() {
     })
 
 
+
+
     // API to update user role like ADMIN:
-    app.patch('/users/admin/:id', async(req, res)=>{
+    app.patch('/users/admin/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) }
       const updateDoc = {
         $set: {
           role: 'admin'
@@ -88,11 +120,15 @@ async function run() {
     })
 
 
+
+
     // Menu related apis
     app.get('/menu', async (req, res) => {
       const result = await menuCollection.find().toArray()
       res.send(result)
     })
+
+
 
 
     // reviews related apis
@@ -102,18 +138,33 @@ async function run() {
     })
 
 
-    // Cart COllection :-
 
-    app.get('/carts', async (req, res) => {
+
+    // Cart collection apis :-
+
+
+    // JWT SECURE
+    app.get('/carts', verifyJWT, async (req, res) => {
       const email = req.query.email;
+
       if (!email) {
         res.send([])
       }
-      const query = {email: email};
+
+      // Check that the token bearer user email and email in jwt token both are same : 2nd layer email verification
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: "Forbidden Access" })
+      }
+
+
+      const query = { email: email };
       const result = await cartCollection.find(query).toArray();
       res.send(result)
 
     })
+
+
 
     app.post('/carts', async (req, res) => {
       const item = req.body;
@@ -122,10 +173,13 @@ async function run() {
       res.send(result);
     })
 
-    app.delete('/carts/:id', async(req, res) =>{
+
+
+    // delete food from the carts
+    app.delete('/carts/:id', async (req, res) => {
       const id = req.params.id;
       console.log(id);
-      const query = {_id: new ObjectId(id)};
+      const query = { _id: new ObjectId(id) };
       const result = await cartCollection.deleteOne(query)
       res.send(result)
     })
