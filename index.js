@@ -68,6 +68,19 @@ async function run() {
     const cartCollection = client.db("bistroDB").collection("carts");
 
 
+    // Warning: use verify JWT before using verifyAdmin
+    const verifyAdmin = async(req, res, next) =>{
+      const email = req.decoded.email;
+      const query = {email: email}
+      const user = await usersCollection.findOne(query);
+      if(user?.role !== 'admin'){
+        return res.status(403).send({ error: true, message: "Forbidden Access" })
+      }
+      next()
+    }
+
+
+
 
     // Create or post jwt 
     app.post('/jwt', (req, res) => {
@@ -82,7 +95,7 @@ async function run() {
 
 
     // user Related apis:-
-    app.get('/users', async (req, res) => {
+    app.get('/users',verifyJWT,verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray()
       res.send(result)
     })
@@ -120,7 +133,7 @@ async function run() {
     })
 
 
-    
+
 
     // API to update user role like ADMIN:
     app.patch('/users/admin/:id', async (req, res) => {
